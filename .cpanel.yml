@@ -1,0 +1,7 @@
+deployment:
+  tasks:
+    - echo "Starting deployment..."
+    - cd $HOME/backend
+    - git pull origin main
+    - npm install --production
+    - pm2 restart all  # Restart backend server
