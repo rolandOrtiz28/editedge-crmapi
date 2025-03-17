@@ -171,15 +171,15 @@ axios.defaults.withCredentials = true;
 
 
 const allowedOrigins = [
-  "http://localhost:8080",  // Local development frontend
-   "https://crm.editedgemultimedia.com",
+  "http://localhost:8080",
+  "https://crm.editedgemultimedia.com",
   "https://crmapi.editedgemultimedia.com"
 ];
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin) || origin.endsWith("editedgemultimedia.com")) {
+      if (!origin || allowedOrigins.includes(origin) || origin.endsWith(".editedgemultimedia.com")) {
         callback(null, true);
       } else {
         console.error(`❌ CORS rejected origin: ${origin}`);
