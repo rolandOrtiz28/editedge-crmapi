@@ -7,6 +7,7 @@ const { storage } = require('../config/cloudinary');
 const upload = multer({ storage });
 const { google } = require("googleapis");
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
+const LocalStrategy = require("passport-local").Strategy;
 require("dotenv").config();
 
 const router = express.Router();
@@ -15,8 +16,6 @@ const googleRedirectUri =
   process.env.NODE_ENV === "production"
     ? process.env.GOOGLE_REDIRECT_URI_PROD
     : process.env.GOOGLE_REDIRECT_URI_DEV;
-
-    console.log("🔍 GOOGLE_CLIENT_ID:", process.env.GOOGLE_CLIENT_ID);
 
 
 passport.use(
@@ -67,22 +66,19 @@ passport.use(
   )
 );
 
-passport.serializeUser((userId, done) => {
-  console.log("🟢 Serializing User ID:", userId);
-  done(null, userId);
+passport.serializeUser((user, done) => {
+  console.log("🟢 Serializing User ID:", user._id.toString());
+  done(null, user._id.toString());
 });
 
+// Deserialize user by fetching from DB
 passport.deserializeUser(async (id, done) => {
-  console.log("🟢 Deserializing User ID:", id, "Type:", typeof id);
-  if (typeof id !== "string" || !id.match(/^[0-9a-fA-F]{24}$/)) {
-    console.error("❌ Invalid ID format, full object received:", JSON.stringify(id, null, 2));
-    return done(new Error("Invalid user ID format"), null);
-  }
+  console.log("🟢 Deserializing User ID:", id);
   try {
-    const user = await User.findById(id);
+    const user = await User.findById(id).select("-password"); // Exclude password
     if (!user) {
       console.log("❌ User not found for ID:", id);
-      return done(new Error("User not found"), null);
+      return done(null, false);
     }
     console.log("🟢 User deserialized:", user._id);
     done(null, user);
@@ -91,6 +87,37 @@ passport.deserializeUser(async (id, done) => {
     done(error, null);
   }
 });
+
+// Local Strategy
+passport.use(
+  new LocalStrategy(
+    { usernameField: "email", passwordField: "password" },
+    async (email, password, done) => {
+      try {
+        console.log("🔵 Local Strategy Hit!");
+        const user = await User.findOne({ email });
+        if (!user) {
+          console.log("❌ No user found for email:", email);
+          return done(null, false, { message: "Incorrect email or password" });
+        }
+        if (!user.password) {
+          console.log("❌ User has no password (likely Google auth):", email);
+          return done(null, false, { message: "Use Google login instead" });
+        }
+        const isMatch = await user.comparePassword(password);
+        if (!isMatch) {
+          console.log("❌ Password mismatch for:", email);
+          return done(null, false, { message: "Incorrect email or password" });
+        }
+        console.log("🟢 Local user authenticated:", user._id);
+        return done(null, user); // Pass full user object to serialize
+      } catch (error) {
+        console.error("❌ Error in Local Strategy:", error);
+        return done(error);
+      }
+    }
+  )
+);
 
 router.get("/users", async (req, res) => {
   try {
@@ -220,22 +247,42 @@ router.post("/register", async (req, res) => {
 });
 
 // ✅ Login Route
-router.post("/login", passport.authenticate("local"), async (req, res) => {
-  try {
-    req.session.user = req.user;
-    
-    req.session.save((err) => {
-      if (err) {
-        console.error("❌ Error saving session:", err);
-        return res.status(500).json({ message: "Session save failed" });
-      }
-      console.log("✅ Session saved successfully!");
-      res.json({ message: "Login successful", user: req.user });
-    });
+router.post(
+  "/login",
+  passport.authenticate("local", { failureRedirect: "/login" }),
+  async (req, res) => {
+    try {
+      console.log("🔵 Login Route Hit!");
+      console.log("🔹 req.user:", req.user ? req.user._id : "No user");
+      console.log("🔹 req.session before save:", req.session);
 
+      req.session.user = req.user; // Optional, but ensure consistency
+
+      req.session.save((err) => {
+        if (err) {
+          console.error("❌ Error saving session:", err);
+          return res.status(500).json({ message: "Session save failed" });
+        }
+        console.log("✅ Session saved successfully!");
+        console.log("🔹 req.session after save:", req.session);
+        res.json({ message: "Login successful", user: req.user });
+      });
+    } catch (error) {
+      console.error("❌ Login error:", error);
+      res.status(500).json({ message: "Login failed", error });
+    }
+  }
+);
+
+// /me route (example, ensure it uses isAuthenticated)
+router.get("/me", isAuthenticated, async (req, res) => {
+  try {
+    console.log("🔵 /me Route Hit!");
+    console.log("🔹 req.user:", req.user ? req.user._id : "No user");
+    res.json({ user: req.user });
   } catch (error) {
-    console.error("❌ Login error:", error);
-    res.status(500).json({ message: "Login failed", error });
+    console.error("❌ Error fetching user data:", error);
+    res.status(500).json({ message: "Error fetching user data", error });
   }
 });
 
@@ -245,18 +292,6 @@ router.post("/logout", isAuthenticated,(req, res) => {
     if (err) return res.status(500).json({ message: "Logout error" });
     res.json({ message: "Logged out successfully" });
   });
-});
-
-
-// routes/auth.js (already present)
-router.get('/me', isAuthenticated, async (req, res) => {
-  try {
-    const user = await User.findById(req.user._id).select('-password');
-    if (!user) return res.status(404).json({ message: 'User not found' });
-    res.json({ user });
-  } catch (error) {
-    res.status(500).json({ message: 'Error fetching user data', error });
-  }
 });
 
 
