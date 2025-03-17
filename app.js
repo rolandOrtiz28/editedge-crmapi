@@ -365,7 +365,7 @@ app.use("/api/tasks",isAuthenticated, tasksRoutes);
 app.use("/api",isAuthenticated, commonRoutes);
 app.use("/api/sales",isAuthenticated, salesRoutes);
 app.use("/api/messages",isAuthenticated, messagesRoutes(io));
-app.use("/api/instagram",isAuthenticated, instagramRoutes(io));
+app.use("/api/instagram", instagramRoutes);
 app.use("/api/emails",isAuthenticated, emailRoutes);
 app.use("/api/templates",isAuthenticated, templateRoutes);
 app.use("/api/dashboard",isAuthenticated, dashboardRoutes);

@@ -2,101 +2,83 @@ const express = require("express");
 const axios = require("axios");
 require("dotenv").config();
 
+const router = express.Router();
+const PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN;  // Store your token in .env
+const PAGE_ID = process.env.PAGE_ID;
 
-module.exports = (io) => {
-    const router = express.Router();
-    const INSTAGRAM_ACCESS_TOKEN = process.env.INSTAGRAM_ACCESS_TOKEN;
-    const PAGE_ID = process.env.INSTAGRAM_PAGE_ID; // Your Instagram Business Page ID
+if (!PAGE_ACCESS_TOKEN) {
+    console.error("🚨 ERROR: PAGE_ACCESS_TOKEN is missing. Check your .env file.");
+}
 
+if (!PAGE_ID) {
+    console.error("🚨 ERROR: PAGE_ID is missing. Check your .env file.");
+}
+// ✅ Fetch Instagram Conversations
+router.get("/conversations", async (req, res) => {
+    console.log("🔍 Using Access Token:", PAGE_ACCESS_TOKEN);
 
-
-    // ✅ Fetch Instagram Conversations
-    router.get("/conversations", async (req, res) => {
-        try {
-            const response = await axios.get(`https://graph.facebook.com/v19.0/${PAGE_ID}/conversations`, {
-                params: {
-                    access_token: INSTAGRAM_ACCESS_TOKEN,
-                    fields: "participants,message_count,updated_time"
-                }
-            });
-
-            res.json(response.data);
-        } catch (error) {
-            res.status(500).json({ error: error.response?.data || error.message });
-        }
-    });
-
-    // ✅ Fetch Messages from a Specific Conversation
-    router.get("/messages/:conversationId", async (req, res) => {
-        try {
-            const { conversationId } = req.params;
-            const response = await axios.get(`https://graph.facebook.com/v19.0/${conversationId}/messages`, {
-                params: {
-                    access_token: INSTAGRAM_ACCESS_TOKEN,
-                    fields: "message,from,created_time,id"
-                }
-            });
-
-            res.json({ data: response.data.data || [] });
-        } catch (error) {
-            res.status(500).json({ error: error.response?.data || error.message });
-        }
-    });
-
-    // ✅ Send a New Message
-    router.post("/send", async (req, res) => {
-        try {
-            const { conversationId, message, from } = req.body;
-
-            if (!conversationId || !message) {
-                return res.status(400).json({ error: "Conversation ID and message are required" });
+    try {
+        const response = await axios.get(`https://graph.facebook.com/v22.0/${PAGE_ID}/conversations`, {
+            params: {
+                platform: "instagram",
+                access_token: PAGE_ACCESS_TOKEN,
+                fields: "participants,message_count,updated_time"
             }
+        });
 
-            const senderName = from?.name || "You"; // Default to "You"
+        res.json(response.data);
+    } catch (error) {
+        console.error("🚨 API ERROR:", error.response?.data || error.message);
+        res.status(500).json({ error: error.response?.data || error.message });
+    }
+});
 
-            // ✅ Get Conversation Details to Extract Recipient ID
-            const conversationResponse = await axios.get(`https://graph.facebook.com/v19.0/${conversationId}`, {
-                params: {
-                    access_token: INSTAGRAM_ACCESS_TOKEN,
-                    fields: "participants",
-                }
-            });
-
-            const participants = conversationResponse.data.participants.data;
-            const recipient = participants.find(p => p.name !== "Edit Edge"); 
-
-            if (!recipient) {
-                return res.status(400).json({ error: "Recipient user not found" });
+// ✅ Fetch Messages from a Specific Conversation
+router.get("/messages/:conversationId", async (req, res) => {
+    try {
+        const { conversationId } = req.params;
+        const response = await axios.get(`https://graph.facebook.com/v22.0/${conversationId}/messages`, {
+            params: {
+                access_token: PAGE_ACCESS_TOKEN,
+                fields: "message,from,created_time,id"
             }
+        });
 
-            const recipientId = recipient.id;
+        res.json(response.data);
+    } catch (error) {
+        res.status(500).json({ error: error.response?.data || error.message });
+    }
+});
 
-            // ✅ Send Message to the User
-            const response = await axios.post(`https://graph.facebook.com/v19.0/me/messages`, {
-                recipient: { id: recipientId },
-                message: { text: message },
-                messaging_type: "RESPONSE",
-            }, {
-                params: { access_token: INSTAGRAM_ACCESS_TOKEN },
-            });
+// ✅ Send a Message to a User
+router.post("/send", async (req, res) => {
+    console.log("📩 Received POST request to /api/instagram/send:", req.body);
+    try {
+      const { recipientId, message } = req.body;
+      if (!recipientId || !message) {
+        return res.status(400).json({ error: "Recipient ID and message are required" });
+      }
+      console.log("📤 Sending to Graph API:", {
+        recipientId,
+        message,
+        access_token: PAGE_ACCESS_TOKEN.slice(0, 10) + "...", // Masked for safety
+      });
+      const response = await axios.post(
+        `https://graph.facebook.com/v22.0/me/messages`,
+        {
+          recipient: { id: recipientId },
+          message: { text: message },
+          messaging_type: "MESSAGE_TAG",
+          tag: "human_agent",
+        },
+        { params: { access_token: PAGE_ACCESS_TOKEN } }
+      );
+      console.log("✅ Graph API response:", response.data);
+      res.json(response.data);
+    } catch (error) {
+      console.error("🚨 API ERROR:", error.response?.data || error.message);
+      res.status(500).json({ error: error.response?.data || error.message });
+    }
+  });
 
-            const messageId = response.data.message_id;
-
-            // ✅ Emit the message via socket.io for real-time updates
-            io.emit("messageReceived", {
-                conversationId,
-                message,
-                from: { name: senderName },
-                created_time: new Date().toISOString(),
-                id: messageId
-            });
-
-            res.json(response.data);
-        } catch (error) {
-            console.error("Error sending message:", error.response?.data || error.message);
-            res.status(500).json({ error: error.response?.data || error.message });
-        }
-    });
-
-    return router;
-};
+module.exports = router;
