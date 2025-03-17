@@ -16,6 +16,9 @@ const googleRedirectUri =
     ? process.env.GOOGLE_REDIRECT_URI_PROD
     : process.env.GOOGLE_REDIRECT_URI_DEV;
 
+    console.log("🔍 GOOGLE_CLIENT_ID:", process.env.GOOGLE_CLIENT_ID);
+
+
 passport.use(
   new GoogleStrategy(
     {
@@ -244,18 +247,17 @@ router.post("/logout", isAuthenticated,(req, res) => {
   });
 });
 
-// ✅ Get Current User
-router.get("/me", isAuthenticated, async (req, res) => {
-  try {
-    const user = await User.findById(req.user._id).select("-password"); // Exclude password
-    if (!user) return res.status(404).json({ message: "User not found" });
 
+// routes/auth.js (already present)
+router.get('/me', isAuthenticated, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select('-password');
+    if (!user) return res.status(404).json({ message: 'User not found' });
     res.json({ user });
   } catch (error) {
-    res.status(500).json({ message: "Error fetching user data", error });
+    res.status(500).json({ message: 'Error fetching user data', error });
   }
 });
-
 
 
 module.exports = router;
