@@ -179,18 +179,20 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (!origin || allowedOrigins.includes(origin) || origin.endsWith("editedgemultimedia.com")) {
         callback(null, true);
       } else {
-        console.error(`CORS rejected origin: ${origin}`);
-        callback(new Error(`Origin ${origin} not allowed by CORS`));
+        console.error(`❌ CORS rejected origin: ${origin}`);
+        callback(new Error("CORS policy does not allow this origin"), false);
       }
     },
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true, // ✅ Allow session cookies
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
+
+
 
 app.use(xss());
 app.use(mongoSanitize());
@@ -226,11 +228,12 @@ const sessionConfig = {
   saveUninitialized: false,
   store: store, // Fix applied here
   cookie: {
-      httpOnly: true,
-      secure: false, // Change to true if using HTTPS
-      expires: Date.now() + 1000 * 60 * 60 * 24 * 7,
-      maxAge: 1000 * 60 * 60 * 24 * 7,
-  },
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production", // ✅ Set `true` for HTTPS
+    sameSite: "none", // ✅ Required for cross-domain cookies
+    expires: Date.now() + 1000 * 60 * 60 * 24 * 7,
+    maxAge: 1000 * 60 * 60 * 24 * 7,
+},
 };
 console.log("🟢 Session middleware initialized");
 app.use(mongoSanitize());
@@ -263,8 +266,8 @@ console.log("🟢 Passport session initialized");
 
 // Log session and user for debugging
 app.use((req, res, next) => {
-  console.log("🔍 Middleware - Session:", req.session);
-  console.log("🔍 Middleware - req.user:", req.user || "No user");
+  console.log("🔍 Debug - Session:", req.session);
+  console.log("🔍 Debug - User:", req.user);
   next();
 });
 
@@ -330,7 +333,7 @@ const server = app.listen(PORT, () => {
 // Attach Socket.io to the existing server
 const io = new Server(server, {
   cors: {
-      origin: "http://localhost:8080", // Adjust this to your frontend URL
+      origin: ["http://localhost:8080", "https://crm.editedgemultimedia.com"],
       methods: ["GET", "POST"]
   }
 });
