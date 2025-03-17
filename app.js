@@ -135,6 +135,44 @@ app.use((req, res, next) => {
   next();
 });
 
+
+const allowedOrigins = [
+  "http://localhost:8080",
+  "https://crm.editedgemultimedia.com",
+  "https://crmapi.editedgemultimedia.com",
+];
+
+app.use((req, res, next) => {
+  console.log("🔍 CORS Middleware Triggered for:", req.headers.origin);
+  next();
+});
+
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, origin); // Use the requested origin instead of "*"
+      } else {
+        console.warn(`❌ CORS Blocked: ${origin}`);
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
+
+// Handle Preflight Requests Manually
+app.options("*", (req, res) => {
+  res.setHeader("Access-Control-Allow-Origin", req.headers.origin || "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+  return res.sendStatus(204);
+});
+
+
 // Passport Initialization
 app.use(passport.initialize());
 console.log("🟢 Passport initialized");
@@ -179,26 +217,6 @@ if (isProduction) app.use(limiter);
 
 axios.defaults.withCredentials = true;
 
-const allowedOrigins = [
-  "http://localhost:8080",
-  "https://crm.editedgemultimedia.com",
-  "https://crmapi.editedgemultimedia.com",
-];
-
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin)) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-  }
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  res.setHeader("Access-Control-Allow-Credentials", "true");
-
-  if (req.method === "OPTIONS") {
-    return res.sendStatus(204);
-  }
-  next();
-});
 
 app.use(xss());
 app.use(mongoSanitize());
