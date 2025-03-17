@@ -26,7 +26,7 @@ const tasksRoutes = require("./routes/tasks");
 const commonRoutes = require("./routes/common");
 const salesRoutes = require("./routes/sales");
 const messagesRoutes = require("./routes/messages");
-const instagramRoutes = require("./routes/instagram");
+const instagramRoutes = require("./routes/instagram").router;
 const emailRoutes = require("./routes/email");
 const templateRoutes = require("./routes/templates");
 const dashboardRoutes = require("./routes/dashboard");
@@ -120,11 +120,12 @@ const sessionConfig = {
   store,
   cookie: {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "none",
+    secure: process.env.NODE_ENV === "production", // Ensure `secure` is only enabled in production
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", // Adjust `sameSite`
     maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
   },
 };
+
 app.use(session(sessionConfig));
 console.log("🟢 Session middleware initialized");
 

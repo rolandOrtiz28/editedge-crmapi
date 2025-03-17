@@ -275,15 +275,21 @@ router.post(
 );
 
 // /me route (example, ensure it uses isAuthenticated)
-router.get("/me", isAuthenticated, async (req, res) => {
-  try {
-    console.log("🔵 /me Route Hit!");
-    console.log("🔹 req.user:", req.user ? req.user._id : "No user");
-    res.json({ user: req.user });
-  } catch (error) {
-    console.error("❌ Error fetching user data:", error);
-    res.status(500).json({ message: "Error fetching user data", error });
+router.get("/me", async (req, res) => {
+  console.log("🔵 /me Route Hit!");
+  console.log("🔹 req.session:", req.session);
+  console.log("🔹 req.user:", req.user);
+
+  if (!req.session.passport || !req.session.passport.user) {
+    return res.status(401).json({ message: "Unauthorized" });
   }
+
+  const user = await User.findById(req.session.passport.user).select("-password");
+  if (!user) return res.status(401).json({ message: "User not found" });
+
+  req.user = user; // Manually attach user
+
+  res.json({ user });
 });
 
 // ✅ Logout Route

@@ -15,31 +15,35 @@ const imapConfig = {
   tls: true,
 };
 
-// Helper function to open the INBOX
-function openInbox(connection, cb) {
-  connection.openBox("INBOX", false, cb); // false means read-write mode
-}
+// Function to fetch emails from the last 2 days
+const fetchEmails = (res = null) => {
+  const connection = new Imap(imapConfig);
+  let emails = [];
 
-// Fetch Business Emails (Reading Emails)
-router.get("/inbox", async (req, res) => {
-  try {
-    const connection = new Imap(imapConfig);
-    let emails = [];
-    let newEmailsCount = 0;
+  connection.on("ready", () => {
+    console.log("📬 IMAP Connection Ready");
 
-    connection.once("ready", () => {
-      openInbox(connection, (err, box) => {
-        if (err) {
-          console.error("Error opening inbox:", err);
+    connection.openBox("INBOX", false, (err, box) => {
+      if (err) {
+        console.error("❌ Error opening inbox:", err);
+        connection.end();
+        if (res) return res.status(500).json({ error: "Failed to open inbox" });
+      }
+
+      // Get emails from the last 2 days
+      const sinceDate = new Date();
+      sinceDate.setDate(sinceDate.getDate() - 2);
+      const formattedDate = sinceDate.toISOString().split("T")[0];
+
+      connection.search([["SINCE", formattedDate]], (err, results) => {
+        if (err || results.length === 0) {
+          console.log("📭 No emails in the last 2 days.");
           connection.end();
-          return res.status(500).json({ error: "Failed to open inbox" });
+          if (res) return res.json({ emails: [], newEmailsCount: 0 });
         }
 
-        // Check for unread messages
-        newEmailsCount = box.messages.unseen || 0;
-
-        const fetch = connection.seq.fetch("1:*", {
-          bodies: "", // Fetch the entire email
+        const fetch = connection.fetch(results, {
+          bodies: "",
           struct: true,
         });
 
@@ -47,7 +51,7 @@ router.get("/inbox", async (req, res) => {
           msg.on("body", (stream, info) => {
             simpleParser(stream, (err, parsed) => {
               if (err) {
-                console.error("Parsing error:", err);
+                console.error("❌ Parsing error:", err);
                 return;
               }
               emails.push({
@@ -55,49 +59,53 @@ router.get("/inbox", async (req, res) => {
                 subject: parsed.subject || "No Subject",
                 from: parsed.from?.text || "Unknown",
                 date: parsed.date || new Date(),
-                text: parsed.text || "", // Plain text content
-                html: parsed.html || "", // HTML content
+                text: parsed.text || "",
+                html: parsed.html || "",
                 messageId: parsed.messageId || "",
-                inReplyTo: parsed.inReplyTo || "",
-              });
-              // Mark the email as read
-              msg.once("attributes", (attrs) => {
-                if (!attrs.flags.includes("\\Seen")) {
-                  connection.addFlags(attrs.uid, "\\Seen", (err) => {
-                    if (err) console.error("Error marking email as read:", err);
-                  });
-                }
               });
             });
           });
         });
 
-        fetch.once("error", (err) => {
-          console.error("Fetch error:", err);
+        fetch.once("end", () => {
+          console.log(`✅ Retrieved ${emails.length} emails from the last 2 days.`);
           connection.end();
-          res.status(500).json({ error: "Failed to fetch emails" });
+          if (res) return res.json({ emails, newEmailsCount: emails.length });
         });
 
-        fetch.once("end", () => {
+        fetch.once("error", (err) => {
+          console.error("❌ Fetch error:", err);
           connection.end();
-          res.json({ emails, newEmailsCount });
+          if (res) return res.status(500).json({ error: "Failed to fetch emails" });
         });
       });
     });
+  });
 
-    connection.once("error", (err) => {
-      console.error("Connection error:", err);
-      res.status(500).json({ error: "Connection failed" });
-    });
+  connection.on("error", (err) => {
+    console.error("❌ IMAP Connection Error:", err);
+    setTimeout(() => {
+      console.log("🔄 Reconnecting to IMAP...");
+      fetchEmails();
+    }, 5000);
+  });
 
-    connection.connect();
-  } catch (error) {
-    console.error("Unexpected error:", error);
-    res.status(500).json({ error: "Internal server error" });
-  }
+  connection.connect();
+};
+
+// Fetch Business Emails (Manually Triggered)
+router.get("/inbox", async (req, res) => {
+  console.log("🔍 Fetching business emails...");
+  fetchEmails(res);
 });
 
-// SMTP Configuration (for Sending/Replies)
+// ✅ Auto-fetch emails every 5 minutes
+setInterval(() => {
+  console.log("🔄 Auto-fetching new emails...");
+  fetchEmails();
+}, 300000); // 300000ms = 5 minutes
+
+// SMTP Configuration (for Sending Emails)
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: Number(process.env.SMTP_PORT),
