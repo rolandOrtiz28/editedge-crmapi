@@ -184,26 +184,21 @@ const allowedOrigins = [
   "https://crm.editedgemultimedia.com",
   "https://crmapi.editedgemultimedia.com",
 ];
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      const allowedOrigins = [
-        "http://localhost:8080",
-        "https://crm.editedgemultimedia.com",
-        "https://crmapi.editedgemultimedia.com",
-      ];
-      if (!origin || allowedOrigins.includes(origin) || origin.endsWith(".editedgemultimedia.com")) {
-        callback(null, true);
-      } else {
-        console.error(`❌ CORS rejected origin: ${origin}`);
-        callback(new Error("CORS policy does not allow this origin"), false);
-      }
-    },
-    credentials: true, // Ensure credentials are allowed
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  })
-);
+
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+  }
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(204);
+  }
+  next();
+});
 
 app.use(xss());
 app.use(mongoSanitize());
