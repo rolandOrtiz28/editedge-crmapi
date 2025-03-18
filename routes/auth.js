@@ -18,53 +18,43 @@ const googleRedirectUri =
     : process.env.GOOGLE_REDIRECT_URI_DEV;
 
 
-passport.use(
-  new GoogleStrategy(
-    {
-      clientID: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL:googleRedirectUri,
-      scope: ["profile", "email", "https://www.googleapis.com/auth/gmail.modify",],
-    },
-    async (accessToken, refreshToken, profile, done) => {
-      try {
-        console.log("🔵 Google Callback Hit!");
-        console.log("🔹 Google ID:", profile.id);
-        console.log("🔹 Google Email:", profile.emails[0].value);
-        console.log("🔹 Access Token:", accessToken);
-        console.log("🔹 Refresh Token:", refreshToken);
-
-        let user = await User.findOne({ googleId: profile.id });
-
-        if (!user) {
-          console.log("🟠 User Not Found - Creating New User");
-          user = new User({
-            googleId: profile.id,
-            name: profile.displayName,
-            email: profile.emails[0].value,
-            profilePicture: profile.photos[0].value,
-            accessToken,
-            refreshToken,
-          });
-          await user.save();
-          console.log("🟢 New Google User Created:", user._id);
-        } else {
-          console.log("🟢 Existing User Found:", user._id);
-          user.accessToken = accessToken;
-          user.refreshToken = refreshToken;
-          await user.save();
-          console.log("🟢 User Tokens Updated:", user._id);
+    passport.use(
+      new GoogleStrategy(
+        {
+          clientID: process.env.GOOGLE_CLIENT_ID,
+          clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+          callbackURL: googleRedirectUri,
+          scope: ["profile", "email"], 
+        },
+        async (accessToken, refreshToken, profile, done) => {
+          try {
+            let user = await User.findOne({ googleId: profile.id });
+    
+            if (!user) {
+              user = new User({
+                googleId: profile.id,
+                name: profile.displayName,
+                email: profile.emails[0].value,
+                profilePicture: profile.photos[0].value,
+                accessToken,
+                refreshToken,
+                scopes: ["profile", "email"], // ✅ Store granted scopes
+              });
+              await user.save();
+            } else {
+              user.accessToken = accessToken;
+              user.refreshToken = refreshToken;
+              await user.save();
+            }
+    
+            return done(null, user._id.toString());
+          } catch (error) {
+            return done(error, null);
+          }
         }
-
-        console.log("🔶 Passing to serializeUser:", user._id.toString());
-        return done(null, user._id.toString());
-      } catch (error) {
-        console.error("❌ Error in Google Strategy:", error);
-        return done(error, null);
-      }
-    }
-  )
-);
+      )
+    );
+    
 
 passport.serializeUser((user, done) => {
   console.log("🟢 Serializing User ID:", user._id.toString());
@@ -128,6 +118,16 @@ router.get("/users", async (req, res) => {
   }
 });
 
+router.get(
+  "/google/additional-scopes",
+  passport.authenticate("google", {
+    scope: ["https://www.googleapis.com/auth/gmail.modify"], // ✅ Ask for Gmail access only when required
+    accessType: "offline",
+    prompt: "consent",
+  })
+);
+
+
 
 // ✅ Google OAuth Login
 router.get("/google", passport.authenticate("google", { accessType: "offline", prompt: "consent" }));
@@ -184,10 +184,15 @@ router.get("/check-google-session", (req, res) => {
   console.log("🔹 Session:", req.session);
 
   if (req.isAuthenticated() && req.user) {
-    const isGoogleLogin = !!req.user.googleId; // Check if googleId exists
+    const isGoogleLogin = !!req.user.googleId;
+
+    // ✅ Check if Gmail API access was granted
+    const hasGmailAccess = req.user.scopes && req.user.scopes.includes("https://www.googleapis.com/auth/gmail.modify");
+
     return res.json({
       authenticated: true,
       isGoogleLogin: isGoogleLogin,
+      hasGmailAccess: hasGmailAccess, // ✅ Only enable Gmail features if granted
       user: {
         id: req.user._id,
         name: req.user.name,
@@ -200,6 +205,7 @@ router.get("/check-google-session", (req, res) => {
 
   res.json({ authenticated: false });
 });
+
 
 router.post("/upload-profile", isAuthenticated, upload.single("file"), async (req, res) => {
     try {

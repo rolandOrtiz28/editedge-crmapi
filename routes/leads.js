@@ -237,6 +237,21 @@ router.post("/", async (req, res) => {
     }
   });
   
+
+  router.delete("/delete-all", async (req, res) => {
+    try {
+      const result = await Lead.deleteMany({});
+  
+      if (result.deletedCount === 0) {
+        return res.status(404).json({ message: "No leads found to delete." });
+      }
+  
+      res.json({ message: "All contacts deleted successfully", deletedCount: result.deletedCount });
+    } catch (error) {
+      console.error("❌ Error deleting all contacts:", error);
+      res.status(500).json({ message: "Error deleting all contacts", error: error.message });
+    }
+  });
   
   
 
