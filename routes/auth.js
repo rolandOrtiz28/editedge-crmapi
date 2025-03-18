@@ -28,18 +28,24 @@ const googleRedirectUri =
         },
         async (accessToken, refreshToken, profile, done) => {
           try {
+            if (!profile || !profile.id) {
+              console.error("❌ Error: Google Profile is undefined or missing ID");
+              return done(new Error("Invalid Google Profile"), null);
+            }
+    
             let user = await User.findOne({ googleId: profile.id });
     
             if (!user) {
               user = new User({
                 googleId: profile.id,
-                name: profile.displayName,
-                email: profile.emails[0].value,
-                profilePicture: profile.photos[0].value,
+                name: profile.displayName || "Unknown User",
+                email: profile.emails?.[0]?.value || "no-email@example.com", // Handle missing emails
+                profilePicture: profile.photos?.[0]?.value || "", // Handle missing profile picture
                 accessToken,
                 refreshToken,
-                scopes: ["profile", "email"], // ✅ Store granted scopes
+                scopes: ["profile", "email"],
               });
+    
               await user.save();
             } else {
               user.accessToken = accessToken;
@@ -47,30 +53,38 @@ const googleRedirectUri =
               await user.save();
             }
     
-            return done(null, user._id.toString());
+            console.log("🟢 Google User Authenticated:", user._id);
+            return done(null, user); // ✅ Pass full user object
           } catch (error) {
+            console.error("❌ Error in Google Strategy:", error);
             return done(error, null);
           }
         }
       )
     );
     
+    
 
-passport.serializeUser((user, done) => {
-  console.log("🟢 Serializing User ID:", user._id.toString());
-  done(null, user._id.toString());
-});
-
+    passport.serializeUser((user, done) => {
+      if (!user || !user._id) {
+        console.error("❌ Error: User or user._id is undefined in serializeUser");
+        return done(new Error("User ID is undefined"), null);
+      }
+    
+      console.log("🟢 Serializing User ID:", user._id.toString());
+      done(null, user._id.toString());
+    });
+    
 // Deserialize user by fetching from DB
 passport.deserializeUser(async (id, done) => {
-  console.log("🟢 Deserializing User ID:", id);
+  
   try {
     const user = await User.findById(id).select("-password"); // Exclude password
     if (!user) {
       console.log("❌ User not found for ID:", id);
       return done(null, false);
     }
-    console.log("🟢 User deserialized:", user._id);
+    // console.log("🟢 User deserialized:", user._id);
     done(null, user);
   } catch (error) {
     console.error("❌ Error deserializing user:", error);
@@ -84,7 +98,7 @@ passport.use(
     { usernameField: "email", passwordField: "password" },
     async (email, password, done) => {
       try {
-        console.log("🔵 Local Strategy Hit!");
+        // console.log("🔵 Local Strategy Hit!");
         const user = await User.findOne({ email });
         if (!user) {
           console.log("❌ No user found for email:", email);
@@ -137,9 +151,9 @@ router.get(
   "/google/callback",
   passport.authenticate("google", { failureRedirect: "/", session: true }),
   async (req, res) => {
-    console.log("🔵 Google Callback Route Hit!");
-    console.log("🔹 req.user:", req.user ? req.user._id : "No user");
-    console.log("🔹 req.session before save:", req.session);
+    // console.log("🔵 Google Callback Route Hit!");
+    // console.log("🔹 req.user:", req.user ? req.user._id : "No user");
+    // console.log("🔹 req.session before save:", req.session);
 
     if (!req.user && req.session.passport && req.session.passport.user) {
       console.log("🟠 req.user not set, fetching from session.passport.user");
@@ -180,8 +194,8 @@ router.get("/google/logout", (req, res) => {
 });
 
 router.get("/check-google-session", (req, res) => {
-  console.log("🔹 Checking Google session - User:", req.user ? req.user._id : "No user");
-  console.log("🔹 Session:", req.session);
+  // console.log("🔹 Checking Google session - User:", req.user ? req.user._id : "No user");
+  // console.log("🔹 Session:", req.session);
 
   if (req.isAuthenticated() && req.user) {
     const isGoogleLogin = !!req.user.googleId;
@@ -258,9 +272,9 @@ router.post(
   passport.authenticate("local", { failureRedirect: "/login" }),
   async (req, res) => {
     try {
-      console.log("🔵 Login Route Hit!");
-      console.log("🔹 req.user:", req.user ? req.user._id : "No user");
-      console.log("🔹 req.session before save:", req.session);
+      // console.log("🔵 Login Route Hit!");
+      // console.log("🔹 req.user:", req.user ? req.user._id : "No user");
+      // console.log("🔹 req.session before save:", req.session);
 
       req.session.user = req.user; // Optional, but ensure consistency
 
@@ -282,21 +296,29 @@ router.post(
 
 // /me route (example, ensure it uses isAuthenticated)
 router.get("/me", async (req, res) => {
-  console.log("🔵 /me Route Hit!");
-  console.log("🔹 req.session:", req.session);
-  console.log("🔹 req.user:", req.user);
+  // console.log("🔵 /me Route Hit!");
+  // console.log("🔹 req.session:", req.session);
+  // console.log("🔹 req.user:", req.user);
 
   if (!req.session.passport || !req.session.passport.user) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
-  const user = await User.findById(req.session.passport.user).select("-password");
-  if (!user) return res.status(401).json({ message: "User not found" });
+  try {
+    const user = await User.findById(req.session.passport.user).select("-password");
+    if (!user) {
+      console.log("❌ User not found in database");
+      return res.status(401).json({ message: "User not found" });
+    }
 
-  req.user = user; // Manually attach user
-
-  res.json({ user });
+    console.log("✅ Sending User Data:", user);
+    return res.json({ user });
+  } catch (error) {
+    console.error("❌ Error fetching user:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
 });
+
 
 // ✅ Logout Route
 router.post("/logout", isAuthenticated,(req, res) => {

@@ -8,13 +8,10 @@ const refreshInstagramToken = async () => {
     
     // ✅ Only refresh every 55 days (not every request)
     if (now - lastRefreshTime < 55 * 24 * 60 * 60 * 1000) {
-        
         return process.env.INSTAGRAM_ACCESS_TOKEN;
     }
 
     try {
-       
-
         const response = await axios.get(`https://graph.facebook.com/v22.0/oauth/access_token`, {
             params: {
                 grant_type: "fb_exchange_token",
@@ -25,7 +22,6 @@ const refreshInstagramToken = async () => {
         });
 
         const newToken = response.data.access_token;
-        
 
         process.env.INSTAGRAM_ACCESS_TOKEN = newToken; // Update token in runtime
         lastRefreshTime = Date.now(); // Update last refresh time
@@ -36,9 +32,14 @@ const refreshInstagramToken = async () => {
     }
 };
 
-// ✅ Refresh only every 55 days
-setInterval(async () => {
-    await refreshInstagramToken();
-}, 55 * 24 * 60 * 60 * 1000);
+// ✅ Use recursive `setTimeout` to avoid integer overflow
+const scheduleTokenRefresh = () => {
+    setTimeout(async () => {
+        await refreshInstagramToken();
+        scheduleTokenRefresh(); // Schedule next refresh
+    }, 24 * 60 * 60 * 1000 * 20); // Refresh every **20 days** (less than 24.8 days limit)
+};
+
+scheduleTokenRefresh();
 
 module.exports = { refreshInstagramToken };

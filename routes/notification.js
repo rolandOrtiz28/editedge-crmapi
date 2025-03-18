@@ -2,6 +2,31 @@ const express = require("express");
 const router = express.Router();
 const Notification = require("../models/Notification");
 
+// Create a new notification
+router.post("/", async (req, res) => {
+  try {
+    const { userId, type, message, relatedId } = req.body; // e.g., { userId: "user123", type: "task", message: "New task assigned", relatedId: "task456" }
+    if (!userId || !type || !message) {
+      return res.status(400).json({ message: "userId, type, and message are required" });
+    }
+
+    const newNotification = new Notification({
+      userId,
+      type,
+      message,
+      relatedId,
+      read: false,
+      createdAt: new Date(),
+    });
+
+    await newNotification.save();
+    res.status(201).json({ message: "Notification created", notification: newNotification });
+  } catch (error) {
+    console.error("Error creating notification:", error);
+    res.status(500).json({ message: "Error creating notification", error: error.message });
+  }
+});
+
 // Get unread notifications for the user
 router.get("/", async (req, res) => {
   try {

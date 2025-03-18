@@ -1,3 +1,4 @@
+// models/Lead.js
 const mongoose = require("mongoose");
 
 const LeadSchema = new mongoose.Schema({
@@ -20,8 +21,8 @@ const LeadSchema = new mongoose.Schema({
       date: Date,
     },
   ],
-  assignee: { type: String, default: null },
-  groups: [{ type: mongoose.Schema.Types.ObjectId, ref: "Group" }], // ✅ NEW FIELD
+  assignee: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null }, // Updated to ObjectId
+  groups: [{ type: mongoose.Schema.Types.ObjectId, ref: "Group" }],
   createdAt: { type: Date, default: Date.now },
 });
 

@@ -4,7 +4,7 @@ const User = require("../models/User");
 const Lead = require("../models/Lead");
 const Contact = require("../models/Contact");
 const Deal = require("../models/Deals");
-
+const Task = require("../models/Task");
 
 // ✅ GET all users
 router.get("/users", async (req, res) => {
@@ -62,5 +62,61 @@ router.get("/subscribers", async (req, res) => {
   }
 });
 
+
+
+router.get("/search", async (req, res) => {
+  const { q } = req.query; // Query parameter 'q' from the search input
+  if (!q || q.trim().length < 2) {
+    return res.status(400).json({ message: "Search query must be at least 2 characters" });
+  }
+
+  try {
+    const searchRegex = new RegExp(q, "i"); // Case-insensitive regex
+
+    // Search across all collections
+    const [leads, tasks, contacts, deals] = await Promise.all([
+      Lead.find({
+        $or: [
+          { name: searchRegex },
+          { company: searchRegex },
+          { email: searchRegex },
+        ],
+      }).limit(5).lean(),
+      Task.find({
+        $or: [
+          { title: searchRegex },
+          { description: searchRegex },
+        ],
+      }).limit(5).lean(),
+      Contact.find({
+        $or: [
+          { name: searchRegex },
+          { company: searchRegex },
+          { email: searchRegex },
+        ],
+      }).limit(5).lean(),
+      Deal.find({
+        $or: [
+          { name: searchRegex },
+          { description: searchRegex },
+        ],
+      }).limit(5).lean(),
+    ]);
+
+    // Format results with type
+    const results = [
+      ...leads.map((lead) => ({ ...lead, type: "lead" })),
+      ...tasks.map((task) => ({ ...task, type: "task" })),
+      ...contacts.map((contact) => ({ ...contact, type: "contact" })),
+      ...deals.map((deal) => ({ ...deal, type: "deal" })),
+    ];
+
+    // Optionally sort or filter further (e.g., by relevance or date)
+    res.json(results.slice(0, 20)); // Limit total results to 20
+  } catch (error) {
+    console.error("❌ Error in global search:", error);
+    res.status(500).json({ message: "Search failed", error });
+  }
+});
 
 module.exports = router;

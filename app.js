@@ -130,8 +130,8 @@ app.use(session(sessionConfig));
 console.log("🟢 Session middleware initialized");
 
 app.use((req, res, next) => {
-  console.log("🔍 Session ID:", req.sessionID);
-  console.log("🔍 Session Data Before Route:", req.session);
+  // console.log("🔍 Session ID:", req.sessionID);
+  // console.log("🔍 Session Data Before Route:", req.session);
   next();
 });
 
@@ -140,10 +140,11 @@ const allowedOrigins = [
   "http://localhost:8080",
   "https://crm.editedgemultimedia.com",
   "https://crmapi.editedgemultimedia.com",
+  "http://localhost:3000"
 ];
 
 app.use((req, res, next) => {
-  console.log("🔍 CORS Middleware Triggered for:", req.headers.origin);
+  // console.log("🔍 CORS Middleware Triggered for:", req.headers.origin);
   next();
 });
 
@@ -229,7 +230,10 @@ app.set("view engine", "ejs");
 app.set("trust proxy", 1);
 
 app.use((req, res, next) => {
-  console.log(`${req.method} ${req.path} - ${req.ip}`);
+  console.log(`🔍 Incoming Request: ${req.method} ${req.path}`);
+  console.log("🔍 Headers:", req.headers);
+  console.log("🔍 Query Params:", req.query);
+  console.log("🔍 Body:", req.body);
   next();
 });
 
@@ -269,7 +273,6 @@ app.use((req, res, next) => {
 
 // Routes
 app.use("/api/auth", authRoutes);
-app.use("/api", isAuthenticated, commonRoutes);
 app.use("/api/leads", isAuthenticated, leadsRoutes);
 app.use("/api/contacts", isAuthenticated, contactRoutes);
 app.use("/api/deals", isAuthenticated, dealsRoutes);
@@ -287,6 +290,7 @@ app.use("/api/notifications", isAuthenticated, notificationsRoutes);
 app.use("/api/settings", isAuthenticated, settingsRoutes);
 app.use("/api/meetings", isAuthenticated, meetingsRoutes);
 app.use("/api/business-email", isAuthenticated, businessEmailRoutes);
+app.use("/api", isAuthenticated, commonRoutes);
 
 // Error Handling
 app.use((req, res) => res.status(404).send("Page not found"));
