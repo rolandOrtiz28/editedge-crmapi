@@ -13,6 +13,8 @@ const imapConfig = {
   host: process.env.IMAP_HOST,
   port: Number(process.env.IMAP_PORT),
   tls: true,
+  authTimeout: 45000, // Increased timeout to 45 seconds
+  // debug: console.log,
 };
 
 // Function to fetch emails from the last 2 days
@@ -87,7 +89,7 @@ const fetchEmails = (res = null) => {
     setTimeout(() => {
       console.log("🔄 Reconnecting to IMAP...");
       fetchEmails();
-    }, 5000);
+    }, 10000);
   });
 
   connection.connect();
