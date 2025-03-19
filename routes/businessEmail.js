@@ -31,7 +31,6 @@ const fetchEmails = (res = null) => {
         if (res) return res.status(500).json({ error: "Failed to open inbox" });
       }
 
-      // Fetch ALL emails instead of filtering by date
       connection.search(["ALL"], (err, results) => {
         if (err || results.length === 0) {
           console.log("📭 No emails found in the inbox.");
@@ -41,38 +40,47 @@ const fetchEmails = (res = null) => {
 
         console.log(`📬 Found ${results.length} emails. Email IDs:`, results);
 
-        const fetch = connection.fetch(results, {
-          bodies: "",
-          struct: true,
-        });
+        const fetch = connection.fetch(results, { bodies: "", struct: true });
+
+        const emailPromises = []; // To track async parsing tasks
 
         fetch.on("message", (msg, seqno) => {
-          msg.on("body", (stream, info) => {
-            simpleParser(stream, (err, parsed) => {
-              if (err) {
-                console.error("❌ Parsing error:", err);
-                return;
-              }
+          const emailPromise = new Promise((resolve) => {
+            msg.on("body", (stream) => {
+              simpleParser(stream, (err, parsed) => {
+                if (err) {
+                  console.error("❌ Parsing error:", err);
+                  return resolve(); // Don't break processing if one email fails
+                }
 
-              const emailData = {
-                id: seqno,
-                subject: parsed.subject || "No Subject",
-                from: parsed.from?.text || "Unknown",
-                date: parsed.date || new Date(),
-                text: parsed.text || "",
-                html: parsed.html || "",
-                messageId: parsed.messageId || "",
-              };
+                const emailData = {
+                  id: seqno,
+                  subject: parsed.subject || "No Subject",
+                  from: parsed.from?.text || "Unknown",
+                  date: parsed.date || new Date(),
+                  text: parsed.text || "",
+                  html: parsed.html || "",
+                  messageId: parsed.messageId || "",
+                };
 
-              emails.push(emailData);
-              console.log(`📩 Email Fetched [ID: ${seqno}] - Subject: ${emailData.subject}`);
+                emails.push(emailData);
+                console.log(`📩 Email Fetched [ID: ${seqno}] - Subject: ${emailData.subject}`);
+                resolve(); // Mark promise as resolved
+              });
             });
           });
+
+          emailPromises.push(emailPromise);
         });
 
-        fetch.once("end", () => {
+        fetch.once("end", async () => {
           console.log(`✅ Retrieved ${emails.length} emails.`);
+
+          // Wait for all email parsing to complete
+          await Promise.all(emailPromises);
+
           connection.end();
+
           if (res) return res.json({ emails, newEmailsCount: emails.length });
         });
 
@@ -95,6 +103,7 @@ const fetchEmails = (res = null) => {
 
   connection.connect();
 };
+
 
 // Fetch Business Emails (Manually Triggered)
 router.get("/inbox", async (req, res) => {
