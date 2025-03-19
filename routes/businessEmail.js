@@ -14,10 +14,9 @@ const imapConfig = {
   port: Number(process.env.IMAP_PORT),
   tls: true,
   authTimeout: 45000, // Increased timeout to 45 seconds
-  // debug: console.log,
 };
 
-// Function to fetch emails from the last 2 days
+// Function to fetch all emails
 const fetchEmails = (res = null) => {
   const connection = new Imap(imapConfig);
   let emails = [];
@@ -32,17 +31,15 @@ const fetchEmails = (res = null) => {
         if (res) return res.status(500).json({ error: "Failed to open inbox" });
       }
 
-      // Get emails from the last 2 days
-      const sinceDate = new Date();
-      sinceDate.setDate(sinceDate.getDate() - 2);
-      const formattedDate = sinceDate.toISOString().split("T")[0];
-
-      connection.search([["SINCE", formattedDate]], (err, results) => {
+      // Fetch ALL emails instead of filtering by date
+      connection.search(["ALL"], (err, results) => {
         if (err || results.length === 0) {
-          console.log("📭 No emails in the last 2 days.");
+          console.log("📭 No emails found in the inbox.");
           connection.end();
           if (res) return res.json({ emails: [], newEmailsCount: 0 });
         }
+
+        console.log(`📬 Found ${results.length} emails. Email IDs:`, results);
 
         const fetch = connection.fetch(results, {
           bodies: "",
@@ -56,7 +53,8 @@ const fetchEmails = (res = null) => {
                 console.error("❌ Parsing error:", err);
                 return;
               }
-              emails.push({
+
+              const emailData = {
                 id: seqno,
                 subject: parsed.subject || "No Subject",
                 from: parsed.from?.text || "Unknown",
@@ -64,13 +62,16 @@ const fetchEmails = (res = null) => {
                 text: parsed.text || "",
                 html: parsed.html || "",
                 messageId: parsed.messageId || "",
-              });
+              };
+
+              emails.push(emailData);
+              console.log(`📩 Email Fetched [ID: ${seqno}] - Subject: ${emailData.subject}`);
             });
           });
         });
 
         fetch.once("end", () => {
-          console.log(`✅ Retrieved ${emails.length} emails from the last 2 days.`);
+          console.log(`✅ Retrieved ${emails.length} emails.`);
           connection.end();
           if (res) return res.json({ emails, newEmailsCount: emails.length });
         });
