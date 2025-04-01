@@ -5,7 +5,7 @@ const { isClientAuthenticated, isAdmin, isClient } = require('../../middleware/c
 const isAuthenticated = require("../../middleware/authMiddleware");
 
 // GET /api/client-tracker/clients - Fetch all clients (admin only)
-router.get('/', isAuthenticated, isAdmin, async (req, res) => {
+router.get('/', isClientAuthenticated, isAdmin, async (req, res) => {
   try {
     const clients = await Client.find();
     res.json({ data: clients });
@@ -13,7 +13,6 @@ router.get('/', isAuthenticated, isAdmin, async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 });
-
 // GET /api/client-tracker/clients/:id - Fetch a client by ID (admin or client)
 router.get('/:id', async (req, res, next) => {
   // Determine which middleware to use based on the request
