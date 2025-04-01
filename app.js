@@ -38,10 +38,17 @@ const settingsRoutes = require("./routes/settings");
 const meetingsRoutes = require("./routes/meetings");
 const businessEmailRoutes = require("./routes/businessEmail");
 
+// COP-ROUTES
+const clientRoutes = require("./routes/clientTracker/clients");
+const clientTaskRoutes = require("./routes/clientTracker/tasks");
+const clientAnalyticsRoutes = require("./routes/clientTracker/analytics");
+const clientInteractionsRoutes = require("./routes/clientTracker/interactions");
+const clientUploadRoutes = require("./routes/clientTracker/upload"); 
+const clientAuthRoutes = require("./routes/clientTracker/auth");
+
 const app = express();
 const PORT = process.env.PORT || 3000;
-const dbUrl =
-  process.env.NODE_ENV === "production" ? process.env.DB_URL : process.env.DB_URL_DEV;
+const dbUrl = process.env.NODE_ENV === "production" ? process.env.DB_URL : process.env.DB_URL_DEV;
 const secret = process.env.SESSION_SECRET || "editedgemultimedia";
 
 // CSP URLs (unchanged)
@@ -271,7 +278,20 @@ app.use((req, res, next) => {
   next();
 });
 
+
 // Routes
+
+app.use((req, res, next) => {
+  console.log(`🔄 Route Matched: ${req.method} ${req.originalUrl}`);
+  next();
+});
+app.use("/api/client-tracker/clients", clientRoutes);
+app.use("/api/client-tracker/tasks", clientTaskRoutes);
+app.use("/api/client-tracker/analytics", clientAnalyticsRoutes);
+app.use("/api/client-tracker/interactions", clientInteractionsRoutes);
+app.use("/api/client-tracker/upload", clientUploadRoutes);
+app.use("/api/client-tracker/auth", clientAuthRoutes);
+// CRM
 app.use("/api/auth", authRoutes);
 app.use("/api/leads", isAuthenticated, leadsRoutes);
 app.use("/api/contacts", isAuthenticated, contactRoutes);
@@ -291,6 +311,10 @@ app.use("/api/settings", isAuthenticated, settingsRoutes);
 app.use("/api/meetings", isAuthenticated, meetingsRoutes);
 app.use("/api/business-email", isAuthenticated, businessEmailRoutes);
 app.use("/api", isAuthenticated, commonRoutes);
+
+// COP
+
+
 
 // Error Handling
 app.use((req, res) => res.status(404).send("Page not found"));

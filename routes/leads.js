@@ -30,6 +30,12 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ message: "Name, Company, and Email are required" });
     }
 
+    const existingLead = await Lead.findOne({ email });
+
+    if (existingLead) {
+      return res.status(400).json({ message: "Lead with this email already exists" });
+    }
+
     const newLead = new Lead({
       name,
       company,
@@ -93,6 +99,7 @@ router.post("/upload-csv", upload.single("file"), async (req, res) => {
 
         const newLeads = [];
         const duplicatePairs = [];
+        const errors = [];
 
         for (const row of formattedData) {
           if (!row.name || !row.email) {
@@ -100,29 +107,34 @@ router.post("/upload-csv", upload.single("file"), async (req, res) => {
             continue;
           }
 
-          const existingLead = await Lead.findOne({ email: row.email });
+          try {
+            const existingLead = await Lead.findOne({ email: row.email });
 
-          if (existingLead) {
-            console.log("❌ Duplicate Lead:", row.email);
-            duplicatePairs.push({ existing: existingLead, new: row });
-          } else {
-            newLeads.push({
-              name: row.name,
-              company: row.company || "",
-              email: row.email,
-              phone: row.phone || "",
-              address: row.address || "",
-              website: row.website || "",
-              description: row.description || "",
-              channel: row.channel || "",
-              companySize: row.companysize || "",
-              niche: row.niche || "",
-              status: row.status || "New",
-              value: parseInt(row.value) || 0,
-              importedBatch: csvFileName,
-              notes: [],
-              reminders: [],
-            });
+            if (existingLead) {
+              console.log("❌ Duplicate Lead:", row.email);
+              duplicatePairs.push({ existing: existingLead, new: row });
+            } else {
+              newLeads.push({
+                name: row.name,
+                company: row.company || "",
+                email: row.email,
+                phone: row.phone || "",
+                address: row.address || "",
+                website: row.website || "",
+                description: row.description || "",
+                channel: row.channel || "",
+                companySize: row.companysize || "",
+                niche: row.niche || "",
+                status: row.status || "New",
+                value: parseInt(row.value) || 0,
+                importedBatch: csvFileName,
+                notes: [],
+                reminders: [],
+              });
+            }
+          } catch (error) {
+            console.error("❌ Error processing row:", row, error);
+            errors.push({ row, error: error.message });
           }
         }
 
@@ -164,6 +176,7 @@ router.post("/upload-csv", upload.single("file"), async (req, res) => {
           leads: insertedLeads,
           added: insertedLeads.length,
           duplicates: duplicatePairs,
+          errors,
         });
       },
     });

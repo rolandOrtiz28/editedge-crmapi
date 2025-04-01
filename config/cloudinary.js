@@ -10,13 +10,16 @@ cloudinary.config({
 
 const storage = new CloudinaryStorage({
     cloudinary,
-    params: {
+    params: async (req, file) => {
+      return {
         folder: 'EditEdgeCRM',
-        allowed_formats: ['jpeg', 'png', 'jpg']
-    }
-})
-
-
+        resource_type: 'auto',
+        allowed_formats: ['jpeg', 'png', 'jpg', 'pdf', 'doc', 'docx', 'txt', 'xlsx', 'xls', 'ppt', 'pptx'],
+        public_id: file.originalname.split('.')[0], // ✅ Now works correctly
+      };
+    },
+  });
+  
 
 module.exports = {
     cloudinary,

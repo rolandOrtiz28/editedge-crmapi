@@ -1,3 +1,4 @@
+// middleware/authMiddleware.js
 module.exports = function isAuthenticated(req, res, next) {
   console.log("🔹 Checking Authentication");
   console.log("🔍 req.originalUrl:", req.originalUrl);
