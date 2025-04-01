@@ -3,55 +3,49 @@ const router = express.Router();
 const ClientTask = require('../../models/ClientTask');
 const Client = require('../../models/Client');
 const { isClientAuthenticated, isAdmin, isClient } = require('../../middleware/clientTrackerAuthMiddleware');
-const isAuthenticated = require("../../middleware/authMiddleware");
 
 // GET /api/client-tracker/analytics/:clientId - Fetch analytics for a client (admin or client)
-router.get('/:clientId', async (req, res, next) => {
-  if (req.headers.authorization) {
-    // Client authentication
-    return isClientAuthenticated(req, res, () => isClient(req, res, async () => {
-      try {
-        const clientId = req.params.clientId;
-        if (clientId !== req.client._id.toString()) {
-          return res.status(403).json({ message: 'Forbidden: You can only access your own analytics' });
-        }
-        const tasks = await ClientTask.find({ clientId });
-        const totalTasks = tasks.length;
-        const completedTasks = tasks.filter((t) => t.status === 'completed').length;
-        res.json({
-          data: {
-            totalTasks,
-            completedTasks,
-          },
-        });
-      } catch (err) {
-        res.status(500).json({ message: 'Server error' });
+router.get('/:clientId', isClientAuthenticated, async (req, res) => {
+  try {
+    console.log("🔍 Fetching analytics for client ID:", req.params.clientId);
+    const clientId = req.params.clientId;
+    const client = await Client.findById(clientId);
+    if (!client) {
+      console.log("❌ Client not found:", clientId);
+      return res.status(404).json({ message: 'Client not found' });
+    }
+
+    // Allow access if the user is the client or an admin
+    if (req.client) {
+      if (clientId !== req.client._id.toString()) {
+        console.log("❌ Client access denied: Can only access own analytics");
+        return res.status(403).json({ message: 'Forbidden: You can only access your own analytics' });
       }
-    }));
-  } else {
-    // Admin authentication
-    return isAuthenticated(req, res, () => isAdmin(req, res, async () => {
-      try {
-        const clientId = req.params.clientId;
-        const tasks = await ClientTask.find({ clientId });
-        const totalTasks = tasks.length;
-        const completedTasks = tasks.filter((t) => t.status === 'completed').length;
-        res.json({
-          data: {
-            totalTasks,
-            completedTasks,
-          },
-        });
-      } catch (err) {
-        res.status(500).json({ message: 'Server error' });
-      }
-    }));
+    } else if (!req.user || req.user.role !== 'admin') {
+      console.log("❌ Admin access required:", req.user);
+      return res.status(403).json({ message: 'Forbidden: Admin access only' });
+    }
+
+    const tasks = await ClientTask.find({ clientId });
+    const totalTasks = tasks.length;
+    const completedTasks = tasks.filter((t) => t.status === 'completed').length;
+    console.log("🔍 Analytics fetched:", { totalTasks, completedTasks });
+    res.json({
+      data: {
+        totalTasks,
+        completedTasks,
+      },
+    });
+  } catch (err) {
+    console.error("❌ Error fetching analytics for client:", err);
+    res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
 
 // GET /api/client-tracker/analytics - Fetch general analytics (admin only)
 router.get('/', isClientAuthenticated, isAdmin, async (req, res) => {
   try {
+    console.log("🔍 Fetching general analytics...");
     const clients = await Client.find();
     const tasks = await ClientTask.find();
 
@@ -67,6 +61,7 @@ router.get('/', isClientAuthenticated, isAdmin, async (req, res) => {
       return acc;
     }, []);
 
+    console.log("🔍 General analytics fetched:", { totalClients: clients.length, totalTasks: tasks.length, clientAcquisition });
     res.json({
       data: {
         totalClients: clients.length,
@@ -75,7 +70,8 @@ router.get('/', isClientAuthenticated, isAdmin, async (req, res) => {
       },
     });
   } catch (err) {
-    res.status(500).json({ message: 'Server error' });
+    console.error("❌ Error fetching general analytics:", err);
+    res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
 

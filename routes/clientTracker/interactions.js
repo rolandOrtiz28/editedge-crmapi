@@ -2,10 +2,10 @@ const express = require('express');
 const router = express.Router();
 const Client = require('../../models/Client');
 const { isAdmin } = require('../../middleware/clientTrackerAuthMiddleware');
-const isAuthenticated = require("../../middleware/authMiddleware");
+const isClientAuthenticated = require("../../middleware/authMiddleware");
 
 // POST /api/client-tracker/interactions - Add a new interaction (admin only)
-router.post('/', isAuthenticated, isAdmin, async (req, res) => {
+router.post('/', isClientAuthenticated, isAdmin, async (req, res) => {
   try {
     const { clientId, type, description } = req.body;
     const client = await Client.findById(clientId);

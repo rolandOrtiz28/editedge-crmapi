@@ -38,7 +38,7 @@ const fetchEmails = (res = null) => {
           if (res) return res.json({ emails: [], newEmailsCount: 0 });
         }
 
-        console.log(`📬 Found ${results.length} emails. Email IDs:`, results);
+       
 
         const fetch = connection.fetch(results, { bodies: "", struct: true });
 
@@ -64,7 +64,6 @@ const fetchEmails = (res = null) => {
                 };
 
                 emails.push(emailData);
-                console.log(`📩 Email Fetched [ID: ${seqno}] - Subject: ${emailData.subject}`);
                 resolve(); // Mark promise as resolved
               });
             });
