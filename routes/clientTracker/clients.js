@@ -51,16 +51,27 @@ router.post('/', isClientAuthenticated, isAdmin, async (req, res) => {
   try {
     console.log("🔍 Adding new client with data:", req.body);
     const { name, email, password, industry, contact, phone, status, assignedTo } = req.body;
+
+    const defaultSteps = [
+      { label: 'Initial Consultation', completed: true, date: '2023-10-01' },
+      { label: 'Proposal Submission', completed: false, date: 'Pending' },
+      { label: 'Contract Signing', completed: false, date: 'Pending' },
+      { label: 'Project Kickoff', completed: false, date: 'Pending' },
+    ];
+
     const newClient = new Client({
       name,
       email,
-      password, // Password will be hashed by the pre-save hook
+      password,
       industry,
       contact,
       phone,
       status: status || 'Active',
       assignedTo,
+      role: 'client', // Explicitly set the role
+      onboardingSteps: defaultSteps,
     });
+
     console.log("🔍 New client object before save:", newClient);
     await newClient.save();
     console.log("🔍 New client saved successfully:", newClient);
@@ -105,5 +116,27 @@ router.delete('/:id', isClientAuthenticated, isAdmin, async (req, res) => {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
+
+// PATCH /api/client-tracker/clients/:id/onboarding
+router.patch('/:id/onboarding', isClientAuthenticated, isAdmin, async (req, res) => {
+  try {
+    const { stepLabel, completed, date } = req.body;
+
+    const client = await Client.findById(req.params.id);
+    if (!client) return res.status(404).json({ message: 'Client not found' });
+
+    const step = client.onboardingSteps.find((s) => s.label === stepLabel);
+    if (!step) return res.status(404).json({ message: 'Step not found' });
+
+    step.completed = completed;
+    step.date = date;
+
+    await client.save();
+    res.json({ message: 'Step updated', data: client.onboardingSteps });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
 
 module.exports = router;

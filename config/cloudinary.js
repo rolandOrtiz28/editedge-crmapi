@@ -11,13 +11,16 @@ cloudinary.config({
 const storage = new CloudinaryStorage({
     cloudinary,
     params: async (req, file) => {
+      const extension = file.originalname.split('.').pop(); // Get extension
+      const filename = file.originalname.replace(/\.[^/.]+$/, ''); // Strip extension for clean name
       return {
         folder: 'EditEdgeCRM',
         resource_type: 'auto',
         allowed_formats: ['jpeg', 'png', 'jpg', 'pdf', 'doc', 'docx', 'txt', 'xlsx', 'xls', 'ppt', 'pptx'],
-        public_id: file.originalname.split('.')[0], // ✅ Now works correctly
+        public_id: `${filename}-${Date.now()}.${extension}` // ✅ Unique & preserves extension
       };
-    },
+    }
+    
   });
   
 

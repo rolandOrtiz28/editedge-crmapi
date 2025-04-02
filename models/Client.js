@@ -24,6 +24,13 @@ const clientSchema = new mongoose.Schema({
       description: { type: String, required: true },
     },
   ],
+  onboardingSteps: [
+    {
+      label: { type: String, required: true },
+      completed: { type: Boolean, default: false },
+      date: { type: String, default: 'Pending' },
+    }
+  ],
   createdAt: { type: Date, default: Date.now },
 });
 
