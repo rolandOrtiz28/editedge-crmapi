@@ -45,6 +45,7 @@ const clientAnalyticsRoutes = require("./routes/clientTracker/analytics");
 const clientInteractionsRoutes = require("./routes/clientTracker/interactions");
 const clientUploadRoutes = require("./routes/clientTracker/upload"); 
 const clientAuthRoutes = require("./routes/clientTracker/auth");
+const clientFormRoutes = require("./routes/clientTracker/form-templates");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -291,6 +292,7 @@ app.use("/api/client-tracker/analytics", clientAnalyticsRoutes);
 app.use("/api/client-tracker/interactions", clientInteractionsRoutes);
 app.use("/api/client-tracker/upload", clientUploadRoutes);
 app.use("/api/client-tracker/auth", clientAuthRoutes);
+app.use("/api/client-tracker/form-templates", clientFormRoutes);
 // CRM
 app.use("/api/auth", authRoutes);
 app.use("/api/leads", isAuthenticated, leadsRoutes);

@@ -3,7 +3,7 @@ const bcrypt = require('bcrypt');
 
 const clientSchema = new mongoose.Schema({
   name: { type: String, required: true },
-  email: { type: String, required: true, unique: true }, // `unique: true` implicitly creates an index
+  email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
   role: { type: String, enum: ['client'], default: 'client' },
   leadId: { type: mongoose.Schema.Types.ObjectId, ref: 'Lead' },
@@ -29,8 +29,45 @@ const clientSchema = new mongoose.Schema({
       label: { type: String, required: true },
       completed: { type: Boolean, default: false },
       date: { type: String, default: 'Pending' },
-    }
+    },
   ],
+  assignedFormTemplate: {
+    templateId: { type: mongoose.Schema.Types.ObjectId, ref: 'FormTemplate' },
+    customFields: [{
+      label: { type: String, required: true },
+      type: { 
+        type: String, 
+        enum: [
+          'text', 'textarea', 'number', 'date', 'checkbox', 'radio', 'select',
+          'multiselect', 'file', 'email', 'url', 'tel', 'password', 'color',
+          'time', 'datetime', 'heading', 'paragraph'
+        ],
+        required: true 
+      },
+      required: { type: Boolean, default: false },
+      options: [String],
+      placeholder: { type: String },
+      helpText: { type: String },
+      defaultValue: { type: mongoose.Schema.Types.Mixed },
+      validation: {
+        type: Object,
+        default: {},
+        of: {
+          minLength: { type: Number },
+          maxLength: { type: Number },
+          min: { type: Number },
+          max: { type: Number },
+          pattern: { type: String },
+          requiredMessage: { type: String },
+        }
+      }
+    }],
+  },
+  consultationFormResponses: {
+    type: Map,
+    of: String,
+    default: new Map(),
+  },
   createdAt: { type: Date, default: Date.now },
 });
 
