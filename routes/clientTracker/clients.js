@@ -5,7 +5,57 @@ const FormTemplate = require('../../models/FormTemplate');
 const { isClientAuthenticated, isAdmin, isClient } = require('../../middleware/clientTrackerAuthMiddleware');
 
 // GET /api/client-tracker/clients - Fetch all clients (admin only)
-router.get('/', isClientAuthenticated, isAdmin, async (req, res) => {
+router.get('/', isClientAuthenticated, isAdmin, async (req, res) => {router.post('/:id/assign-form-template', isClientAuthenticated, isAdmin, async (req, res) => {
+  try {
+    const { templateId, customFields } = req.body;
+    const client = await Client.findById(req.params.id);
+    if (!client) return res.status(404).json({ message: 'Client not found' });
+    
+    const template = await FormTemplate.findById(templateId);
+    if (!template) return res.status(404).json({ message: 'Template not found' });
+
+    client.assignedFormTemplate = { templateId, customFields: customFields || template.fields };
+    await client.save();
+    res.json({ data: client });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// POST /api/client-tracker/clients/:id/initial-consultation - Client submits form
+router.post('/:id/initial-consultation', isClientAuthenticated, async (req, res) => {
+  try {
+    const client = await Client.findById(req.params.id).populate('assignedFormTemplate.templateId');
+    if (!client) return res.status(404).json({ message: 'Client not found' });
+
+    // Check if Initial Consultation is active
+    const initialStep = client.onboardingSteps.find(step => step.label === 'Initial Consultation');
+    if (!initialStep || initialStep.completed) {
+      return res.status(403).json({ message: 'Form only available during Initial Consultation' });
+    }
+
+    // Ensure client can only submit their own form
+    if (req.client && client._id.toString() !== req.client._id.toString()) {
+      return res.status(403).json({ message: 'Forbidden: You can only submit your own form' });
+    }
+
+    const formFields = client.assignedFormTemplate.customFields;
+    const responses = req.body; // { "label1": "value1", "label2": "value2" }
+
+    // Validate required fields
+    for (const field of formFields) {
+      if (field.required && (!responses[field.label] || responses[field.label].trim() === '')) {
+        return res.status(400).json({ message: `Missing required field: ${field.label}` });
+      }
+    }
+
+    client.consultationFormResponses = new Map(Object.entries(responses));
+    await client.save();
+    res.status(200).json({ message: 'Form submitted successfully', data: client });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
   try {
     console.log("🔍 Fetching all clients...");
     const clients = await Client.find();

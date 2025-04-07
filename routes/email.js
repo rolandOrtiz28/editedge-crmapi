@@ -92,52 +92,67 @@ router.get("/", async (req, res) => {
 });
 
 
+
 // Send an email
 router.post("/send", upload.array("attachments"), async (req, res) => {
   try {
-    const { to, subject, html } = req.body; // ✅ Accepts HTML content instead of plain text
+    const { to, subject, html, text, from } = req.body;
     const attachments = req.files || [];
 
-    if (!to || !subject || !html) {
+    // Validate required fields
+    if (!to || !subject || (!text && !html) || !from) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
     // Authenticate Gmail API
-    const gmail = await getGmailClient(); // ✅ Business email credentials
+    const gmail = await getGmailClient(); // ✅ Uses business email credentials
 
-    // Construct Email with MIME format
-    const boundary = "----=_Part_123456";
+    // Construct MIME Email
+    const boundary = "boundary123";
     let emailLines = [];
 
-    emailLines.push(`From: editedgemultimedia@gmail.com`);
+    emailLines.push(`From: ${from}`);
     emailLines.push(`To: ${to}`);
     emailLines.push(`Subject: ${subject}`);
     emailLines.push(`MIME-Version: 1.0`);
     emailLines.push(`Content-Type: multipart/mixed; boundary="${boundary}"`);
     emailLines.push("");
-    
-    // HTML Body
-    emailLines.push(`--${boundary}`);
-    emailLines.push(`Content-Type: text/html; charset="UTF-8"`);
-    emailLines.push("");
-    emailLines.push(html);
-    emailLines.push("");
 
-    // Attachments (if any)
+    // Add plain text part
+    if (text) {
+      emailLines.push(`--${boundary}`);
+      emailLines.push(`Content-Type: text/plain; charset="UTF-8"`);
+      emailLines.push("");
+      emailLines.push(text);
+      emailLines.push("");
+    }
+
+    // Add HTML part
+    if (html) {
+      emailLines.push(`--${boundary}`);
+      emailLines.push(`Content-Type: text/html; charset="UTF-8"`);
+      emailLines.push(`Content-Transfer-Encoding: quoted-printable`);
+      emailLines.push("");
+      emailLines.push(html);
+      emailLines.push("");
+    }
+
+    // Add attachments
     for (const file of attachments) {
       const fileContent = file.buffer.toString("base64");
       emailLines.push(`--${boundary}`);
       emailLines.push(`Content-Type: ${file.mimetype}; name="${file.originalname}"`);
-      emailLines.push(`Content-Transfer-Encoding: base64`);
       emailLines.push(`Content-Disposition: attachment; filename="${file.originalname}"`);
+      emailLines.push(`Content-Transfer-Encoding: base64`);
       emailLines.push("");
       emailLines.push(fileContent);
       emailLines.push("");
     }
 
     emailLines.push(`--${boundary}--`);
+    emailLines.push("");
 
-    // Encode email to base64
+    // Encode the email to base64
     const raw = Buffer.from(emailLines.join("\r\n"))
       .toString("base64")
       .replace(/\+/g, "-")
@@ -227,84 +242,6 @@ router.put("/trash/:id", async (req, res) => {
   }
 });
 
-
-router.post("/send", upload.array("attachments"), async (req, res) => {
-  try {
-    const { to, subject, text, html } = req.body; // ✅ Accepts both plain text & HTML
-    const attachments = req.files || [];
-
-    if (!to || !subject || (!text && !html)) {
-      return res.status(400).json({ error: "Missing required fields" });
-    }
-
-    // Authenticate Gmail API
-    const gmail = await getGmailClient(); // ✅ Uses business email credentials
-
-    // Construct MIME Email
-    const boundary = "boundary123";
-    let emailLines = [];
-
-    emailLines.push(`From: editedgemultimedia@gmail.com`);
-    emailLines.push(`To: ${to}`);
-    emailLines.push(`Subject: ${subject}`);
-    emailLines.push(`MIME-Version: 1.0`);
-    emailLines.push(`Content-Type: multipart/alternative; boundary="${boundary}"`);
-    emailLines.push("");
-
-    if (text) {
-      emailLines.push(`--${boundary}`);
-      emailLines.push(`Content-Type: text/plain; charset="UTF-8"`);
-      emailLines.push("");
-      emailLines.push(text);
-      emailLines.push("");
-    }
-
-    if (html) {
-      emailLines.push(`--${boundary}`);
-      emailLines.push(`Content-Type: text/html; charset="UTF-8"`);
-      emailLines.push("Content-Transfer-Encoding: quoted-printable"); // ✅ FIX: Ensure HTML is properly encoded
-      emailLines.push("");
-      emailLines.push(html);
-      emailLines.push("");
-    }
-
-    emailLines.push(`--${boundary}--`);
-    emailLines.push("");
-
-    // Attachments (if any)
-    if (attachments.length > 0) {
-      emailLines.push(`--${boundary}`);
-      for (const file of attachments) {
-        const fileContent = file.buffer.toString("base64");
-        emailLines.push(`Content-Type: ${file.mimetype}; name="${file.originalname}"`);
-        emailLines.push(`Content-Disposition: attachment; filename="${file.originalname}"`);
-        emailLines.push(`Content-Transfer-Encoding: base64`);
-        emailLines.push("");
-        emailLines.push(fileContent);
-        emailLines.push("");
-      }
-      emailLines.push(`--${boundary}--`);
-    }
-
-    // Encode email to base64
-    const raw = Buffer.from(emailLines.join("\r\n"))
-      .toString("base64")
-      .replace(/\+/g, "-")
-      .replace(/\//g, "_")
-      .replace(/=+$/, "");
-
-    // Send Email via Gmail API
-    const response = await gmail.users.messages.send({
-      userId: "me",
-      requestBody: { raw },
-    });
-
-    res.json({ message: "Email sent successfully", emailId: response.data.id });
-  } catch (error) {
-    console.error("Error sending email:", error);
-    res.status(500).json({ error: "Failed to send email" });
-  }
-});
 
 
 router.get("/:id", async (req, res) => {
